@@ -2,9 +2,10 @@ use std::fmt::Debug;
 use num_traits::Float;
 
 pub struct CauchyTask<T, N> {
-    pub size: usize,
-    pub initial_conditions: Box<[(N, N)]>,
-    pub definitions: Box<[Function<T, N>]>,
+    pub(crate) size: usize,
+    pub(crate) initial_conditions: Box<[N]>,
+    pub(crate) initial_time: T,
+    pub(crate) definitions: Box<[Function<T, N>]>,
 }
 
 pub struct Function<T, N> {
@@ -39,7 +40,8 @@ impl<T, N> Function<T, N> {
 impl<T, N> CauchyTask<T, N> {
     pub fn new<const S: usize>(
         definitions: [Function<T, N>; S],
-        initial_conditions: [(N, N); S],
+        initial_time: T,
+        initial_conditions: [N; S],
     ) -> Self
     where
         N: Copy + PartialEq + Debug + 'static,
@@ -48,6 +50,7 @@ impl<T, N> CauchyTask<T, N> {
             size: S,
             definitions: Box::new(definitions),
             initial_conditions: Box::new(initial_conditions),
+            initial_time
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::task::CauchyTask;
 use num_traits::Float;
+use std::iter::once;
 
 struct SolutionIter<'t, S, T, N> {
     solver: S,
@@ -61,13 +62,16 @@ where
         task: &CauchyTask<T, T>,
         stop_condition: StopCondition<T>,
     ) -> Vec<(T, Box<[T]>)> {
-        self.last_solution = task.initial_conditions.iter().map(|it| it.1).collect();
-        
-        let iter = SolutionIter { solver: self, task };
-        iter.take_while(|(t, _)| match stop_condition {
-            StopCondition::Timed { maximum } => t < &maximum,
-        })
-        .collect()
+        self.last_solution = task.initial_conditions.clone();
+        self.current_time = task.initial_time;
+
+        once((self.current_time, self.last_solution.clone()))
+            .chain(
+                SolutionIter { solver: self, task }.take_while(|(t, _)| match stop_condition {
+                    StopCondition::Timed { maximum } => t < &maximum,
+                }),
+            )
+            .collect()
     }
 
     fn next_solution(&mut self, task: &CauchyTask<T, T>) -> (T, &[T]) {
