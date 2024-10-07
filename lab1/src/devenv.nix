@@ -1,8 +1,6 @@
 { pkgs, lib, config, inputs, ... }:
 
 {
-  packages = with pkgs; [
-  	cmake 
-  	clang
-  ];
+    languages.rust.enable = true;
+    languages.rust.channel = "stable";
 }
