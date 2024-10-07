@@ -78,7 +78,7 @@ where
         let yi = self
             .last_solution
             .iter()
-            .zip(&task.definitions)
+            .zip(&task.derivatives)
             .map(|(&y_prev, f)| y_prev + self.h * f.eval(self.current_time, &self.last_solution))
             .collect();
         let xi = self.current_time + self.h;

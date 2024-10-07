@@ -5,7 +5,7 @@ pub struct CauchyTask<T, N> {
     pub(crate) size: usize,
     pub(crate) initial_conditions: Box<[N]>,
     pub(crate) initial_time: T,
-    pub(crate) definitions: Box<[Function<T, N>]>,
+    pub(crate) derivatives: Box<[Function<T, N>]>,
 }
 
 pub struct Function<T, N> {
@@ -39,7 +39,7 @@ impl<T, N> Function<T, N> {
 
 impl<T, N> CauchyTask<T, N> {
     pub fn new<const S: usize>(
-        definitions: [Function<T, N>; S],
+        derivatives: [Function<T, N>; S],
         initial_time: T,
         initial_conditions: [N; S],
     ) -> Self
@@ -48,7 +48,7 @@ impl<T, N> CauchyTask<T, N> {
     {
         Self {
             size: S,
-            definitions: Box::new(definitions),
+            derivatives: Box::new(derivatives),
             initial_conditions: Box::new(initial_conditions),
             initial_time
         }
