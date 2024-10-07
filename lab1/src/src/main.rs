@@ -1,8 +1,23 @@
+mod plot;
+
+use crate::plot::{Line, Plotter};
 use anyhow::Error;
+use plotters::prelude::{Color, BLUE, GREEN, RED};
 use project::solver::{EulerSolver, Solver, StopCondition};
 use project::task::{f, CauchyTask};
 use std::fs::File;
 use std::io::Write;
+use std::ops::Range;
+use std::path::PathBuf;
+use std::sync::LazyLock;
+
+fn build_line(xs: &[f64], ys: &[f64], color: impl Color, label: impl Into<String>) -> Line {
+    Line::new(xs.iter().cloned().zip(ys.iter().cloned()), color, label)
+}
+
+const RUN_TIME: f64 = 10.0;
+const VIEWPORT_SIZE: (Range<f64>, Range<f64>) = (-0.1..RUN_TIME + 0.1, -0.1..1.1);
+const ARTIFACT_NAME: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("output"));
 
 fn main() -> Result<(), Error> {
     let k1 = 0.577;
@@ -18,16 +33,33 @@ fn main() -> Result<(), Error> {
         [1.0, 0.0, 0.0],
     );
 
-    let mut output_file = File::create("output.csv")?;
+    let mut output_file = File::create(ARTIFACT_NAME.with_extension("csv"))?;
+    let (mut ts, mut xs1, mut xs2, mut xs3) = (vec![], vec![], vec![], vec![]);
 
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
     for (t, xs) in EulerSolver::new(0.1)
-        .solve_task(&task, StopCondition::Timed { maximum: 10.0 })
+        .solve_task(&task, StopCondition::Timed { maximum: RUN_TIME })
         .into_iter()
     {
+        ts.push(t);
+        xs1.push(xs[0]);
+        xs2.push(xs[1]);
+        xs3.push(xs[2]);
         writeln!(output_file, "{}, {}, {}, {}", t, xs[0], xs[1], xs[2])?;
     }
+
+    Plotter::new(
+        ARTIFACT_NAME.with_extension("svg"),
+        (1024, 720),
+        VIEWPORT_SIZE,
+        [
+            build_line(&ts, &xs1, &RED, "x_1"),
+            build_line(&ts, &xs2, &GREEN, "x_2"),
+            build_line(&ts, &xs3, &BLUE, "x_3"),
+        ],
+    )
+    .draw()?;
 
     Ok(())
 }
