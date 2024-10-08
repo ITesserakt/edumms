@@ -1,6 +1,8 @@
 use crate::task::CauchyTask;
 use num_traits::Float;
 use std::iter::once;
+use std::marker::PhantomData;
+use crate::assert_is_object_safe;
 
 struct SolutionIter<'t, S, T, N> {
     solver: S,
@@ -21,10 +23,25 @@ pub trait Solver<T, N> {
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]);
 }
 
+assert_is_object_safe!(Solver<f64, f64>);
+
+#[derive(Copy, Clone, Debug)]
+pub struct ExternalSolver<T, N> {
+    _phantom: PhantomData<(T, N)>
+}
+
 pub struct EulerSolver<T> {
     h: T,
     last_solution: Box<[T]>,
     current_time: T,
+}
+
+impl<T, N> ExternalSolver<T, N> {
+    pub fn new() -> Self {
+        Self {
+            _phantom: PhantomData
+        }
+    }
 }
 
 impl<T> EulerSolver<T>

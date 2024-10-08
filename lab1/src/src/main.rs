@@ -17,7 +17,7 @@ fn build_line(xs: &[f64], ys: &[f64], color: impl Color, label: impl Into<String
 
 const RUN_TIME: f64 = 10.0;
 const VIEWPORT_SIZE: (Range<f64>, Range<f64>) = (-0.1..RUN_TIME + 0.1, -0.1..1.1);
-const ARTIFACT_NAME: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("output"));
+const ARTIFACT_NAME: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("./out/plot"));
 
 fn main() -> Result<(), Error> {
     let k1 = 0.577;

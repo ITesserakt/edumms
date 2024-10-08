@@ -6,5 +6,8 @@
 
     packages = with pkgs; [
         fontconfig
+        cmake
+        clang
+        gnumake
     ];
 }
