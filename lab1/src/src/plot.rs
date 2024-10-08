@@ -8,6 +8,7 @@ pub struct Line {
     data_points: Vec<(f64, f64)>,
     style: ShapeStyle,
     label: String,
+    dashed: bool,
 }
 
 pub struct Plotter {
@@ -23,11 +24,13 @@ impl Line {
         data_points: impl IntoIterator<Item = (f64, f64)>,
         style: impl Into<ShapeStyle>,
         label: impl Into<String>,
+        dashed: bool,
     ) -> Self {
         Self {
             data_points: data_points.into_iter().collect(),
             style: style.into(),
             label: label.into(),
+            dashed,
         }
     }
 }
@@ -49,9 +52,10 @@ impl Plotter {
     }
 
     pub fn draw(self) -> Result<(), Error> {
-        let root = SVGBackend::new(&self.output_path, self.size).into_drawing_area();
+        let root = SVGBackend::new(&self.output_path, self.size)
+            .into_drawing_area();
         root.fill(&WHITE)?;
-        
+
         let label_size = {
             let (x, y) = self.size;
             let min = x.min(y);
@@ -66,10 +70,13 @@ impl Plotter {
         chart.configure_mesh().draw()?;
 
         for line in self.lines {
-            chart
-                .draw_series(LineSeries::new(line.data_points, line.style.clone()))?
-                .label(line.label)
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], line.style));
+            if line.dashed {
+                chart.draw_series(DashedLineSeries::new(line.data_points, 5, 5, line.style))
+            } else {
+                chart.draw_series(LineSeries::new(line.data_points, line.style))
+            }?
+            .label(line.label)
+            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], line.style));
         }
 
         chart

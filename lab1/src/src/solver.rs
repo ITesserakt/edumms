@@ -8,6 +8,7 @@ use ouroboros::self_referencing;
 use std::ffi::OsStr;
 use std::iter::{once, repeat_with};
 
+#[derive(Debug, Copy, Clone)]
 pub enum StopCondition<T> {
     Timed { maximum: T },
 }
