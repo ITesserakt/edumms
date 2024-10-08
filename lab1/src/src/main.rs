@@ -3,7 +3,7 @@ mod plot;
 use crate::plot::{Line, Plotter};
 use anyhow::Error;
 use plotters::prelude::{Color, BLUE, GREEN, RED};
-use project::solver::{EulerSolver, Solver, StopCondition};
+use project::solver::{ExternalSolver, Solver, StopCondition};
 use project::task::{f, CauchyTask};
 use std::fs::File;
 use std::io::Write;
@@ -17,7 +17,9 @@ fn build_line(xs: &[f64], ys: &[f64], color: impl Color, label: impl Into<String
 
 const RUN_TIME: f64 = 10.0;
 const VIEWPORT_SIZE: (Range<f64>, Range<f64>) = (-0.1..RUN_TIME + 0.1, -0.1..1.1);
+const PLOT_SIZE: (u32, u32) = (640, 480);
 const ARTIFACT_NAME: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("./out/plot"));
+const SOLVER_PATH: &'static str = "solvers/solver.so";
 
 fn main() -> Result<(), Error> {
     let k1 = 0.577;
@@ -38,7 +40,8 @@ fn main() -> Result<(), Error> {
 
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
-    for (t, xs) in EulerSolver::new(0.1)
+    let solver = unsafe { ExternalSolver::build(SOLVER_PATH)? };
+    for (t, xs) in solver
         .solve_task(&task, StopCondition::Timed { maximum: RUN_TIME })
         .into_iter()
     {
@@ -51,7 +54,7 @@ fn main() -> Result<(), Error> {
 
     Plotter::new(
         ARTIFACT_NAME.with_extension("svg"),
-        (1024, 720),
+        PLOT_SIZE,
         VIEWPORT_SIZE,
         [
             build_line(&ts, &xs1, &RED, "x_1"),

@@ -1,13 +1,12 @@
-use crate::task::CauchyTask;
-use num_traits::Float;
-use std::iter::once;
-use std::marker::PhantomData;
 use crate::assert_is_object_safe;
-
-struct SolutionIter<'t, S, T, N> {
-    solver: S,
-    task: &'t CauchyTask<T, N>,
-}
+use crate::ffi::{SolverEvalNextFn, SolverPrepareFn};
+use crate::task::CauchyTask;
+use anyhow::Error;
+use libloading::{Library, Symbol};
+use num_traits::Float;
+use ouroboros::self_referencing;
+use std::ffi::OsStr;
+use std::iter::{once, repeat_with};
 
 pub enum StopCondition<T> {
     Timed { maximum: T },
@@ -25,9 +24,15 @@ pub trait Solver<T, N> {
 
 assert_is_object_safe!(Solver<f64, f64>);
 
-#[derive(Copy, Clone, Debug)]
-pub struct ExternalSolver<T, N> {
-    _phantom: PhantomData<(T, N)>
+#[self_referencing]
+pub struct ExternalSolver<T: 'static, N: 'static> {
+    library: Library,
+    #[borrows(library)]
+    #[covariant]
+    pub(crate) symbol_prepare: Symbol<'this, SolverPrepareFn<T, N>>,
+    #[borrows(library)]
+    #[covariant]
+    pub(crate) symbol_next: Symbol<'this, SolverEvalNextFn<T, N>>,
 }
 
 pub struct EulerSolver<T> {
@@ -37,10 +42,14 @@ pub struct EulerSolver<T> {
 }
 
 impl<T, N> ExternalSolver<T, N> {
-    pub fn new() -> Self {
-        Self {
-            _phantom: PhantomData
-        }
+    // OMG very unsafe code
+    pub unsafe fn build(external_library_path: impl AsRef<OsStr>) -> Result<Self, Error> {
+        let this = Self::try_new(
+            Library::new(external_library_path)?,
+            |lib| lib.get(b"solver_prepare\0"),
+            |lib| lib.get(b"solver_eval_next\0"),
+        )?;
+        Ok(this)
     }
 }
 
@@ -57,19 +66,6 @@ where
     }
 }
 
-impl<S, T, N> Iterator for SolutionIter<'_, S, T, N>
-where
-    S: Solver<T, N>,
-    N: Clone,
-{
-    type Item = (T, Box<[N]>);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (x, y) = self.solver.next_solution(self.task);
-        Some((x, Box::<[N]>::from(y)))
-    }
-}
-
 impl<T> Solver<T, T> for EulerSolver<T>
 where
     T: Float,
@@ -83,11 +79,13 @@ where
         self.current_time = task.initial_time;
 
         once((self.current_time, self.last_solution.clone()))
-            .chain(
-                SolutionIter { solver: self, task }.take_while(|(t, _)| match stop_condition {
-                    StopCondition::Timed { maximum } => t < &maximum,
-                }),
-            )
+            .chain(repeat_with(|| {
+                let (t, xs) = self.next_solution(task);
+                (t, Box::<[T]>::from(xs))
+            }))
+            .take_while(|(t, _)| match &stop_condition {
+                StopCondition::Timed { maximum } => t <= maximum,
+            })
             .collect()
     }
 

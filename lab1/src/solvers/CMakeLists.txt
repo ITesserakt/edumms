@@ -2,8 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 project(solvers)
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wpedantic -std=c++20 -g")
 
-add_library(runge-kutta SHARED src/runge_kutta.cpp include/ffi.h)
+add_library(runge-kutta SHARED src/runge_kutta.cpp)
 target_include_directories(runge-kutta PUBLIC include/)
