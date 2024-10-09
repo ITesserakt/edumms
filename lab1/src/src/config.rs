@@ -18,7 +18,17 @@ pub struct Runtime {
     pub output_dir: PathBuf,
     #[serde(default = "def_lib_dir")]
     pub lib_dir: PathBuf,
-    pub solver: String
+    pub solver: String,
+    #[serde(default)]
+    pub output_type: Output
+}
+
+#[derive(Serialize, Deserialize, Default, Copy, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum Output {
+    Png,
+    #[default]
+    Svg
 }
 
 #[derive(Serialize, Deserialize)]
@@ -82,6 +92,7 @@ impl Default for Runtime {
             output_dir: def_output_dir(),
             lib_dir: def_lib_dir(),
             solver: "euler".to_string(),
+            output_type: Default::default()
         }
     }
 }

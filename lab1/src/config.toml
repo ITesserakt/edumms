@@ -1,6 +1,6 @@
 [general]
 lib_dir = "./solvers/cmake-build-debug"
-solver = "librunge-kutta"
+solver = "runge-kutta"
 t_max = 10
 
 [plotting.viewport]

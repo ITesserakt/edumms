@@ -1,10 +1,10 @@
 mod config;
-mod plot;
+pub mod plot;
 
 use crate::config::Config;
 use crate::plot::{Line, Plotter};
 use anyhow::Error;
-use libloading::Library;
+use libloading::{library_filename, Library};
 use plotters::prelude::{Color, BLUE, GREEN, RED};
 use project::solver::{ExternalSolver, Solver, StopCondition};
 use project::task::{f, CauchyTask};
@@ -44,9 +44,9 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| {
 
 static LIBRARY: LazyLock<Library> = LazyLock::new(|| {
     let mut path = CONFIG.general.lib_dir.clone();
-    path.push(&CONFIG.general.solver);
-    let solver_lib_path = path.with_extension("so");
-    unsafe { Library::new(solver_lib_path).expect("Could not load solver library") }
+    let solver_lib_name = library_filename(&CONFIG.general.solver);
+    path.push(solver_lib_name);
+    unsafe { Library::new(path).expect("Could not load solver library") }
 });
 
 fn main() -> Result<(), Error> {
@@ -94,7 +94,7 @@ fn main() -> Result<(), Error> {
             build_line(&ts, &xs3, &BLUE, "x_3", false),
         ],
     )
-    .draw()?;
+    .draw(CONFIG.general.output_type)?;
 
     Ok(())
 }

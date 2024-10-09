@@ -1,4 +1,6 @@
+use crate::config::Output;
 use anyhow::Error;
+use plotters::coord::Shift;
 use plotters::prelude::*;
 use std::ops::Range;
 use std::path::Path;
@@ -51,9 +53,10 @@ impl Plotter {
         }
     }
 
-    pub fn draw(self) -> Result<(), Error> {
-        let root = SVGBackend::new(&self.output_path, self.size)
-            .into_drawing_area();
+    fn draw_raw<DB: DrawingBackend>(self, root: DrawingArea<DB, Shift>) -> Result<(), Error>
+    where
+        <DB as DrawingBackend>::ErrorType: 'static,
+    {
         root.fill(&WHITE)?;
 
         let label_size = {
@@ -88,5 +91,19 @@ impl Plotter {
         root.present()?;
 
         Ok(())
+    }
+
+    pub fn draw(self, output_type: Output) -> Result<(), Error> {
+        let output_path = match output_type {
+            Output::Png => self.output_path.with_extension("png"),
+            Output::Svg => self.output_path.with_extension("svg"),
+        };
+        let size = self.size;
+        match output_type {
+            Output::Png => {
+                self.draw_raw(BitMapBackend::new(&output_path, size).into_drawing_area())
+            }
+            Output::Svg => self.draw_raw(SVGBackend::new(&output_path, size).into_drawing_area()),
+        }
     }
 }
