@@ -1,4 +1,3 @@
-use crate::assert_is_object_safe;
 use crate::ffi::{SolverEvalNextFn, SolverPrepareFn};
 use crate::task::CauchyTask;
 use anyhow::Error;
@@ -8,8 +7,10 @@ use ouroboros::self_referencing;
 use std::ffi::OsStr;
 use std::iter::{once, repeat_with};
 
+/// Condition used to stop solver
 #[derive(Debug, Copy, Clone)]
 pub enum StopCondition<T> {
+    /// Specifies maximum time solver can compute
     Timed { maximum: T },
 }
 
@@ -22,8 +23,6 @@ pub trait Solver<T, N> {
 
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]);
 }
-
-assert_is_object_safe!(Solver<f64, f64>);
 
 #[self_referencing]
 pub struct ExternalSolver<T: 'static, N: 'static> {
@@ -97,10 +96,9 @@ where
             .zip(&task.derivatives)
             .map(|(&y_prev, f)| y_prev + self.h * f.eval(self.current_time, &self.last_solution))
             .collect();
-        let xi = self.current_time + self.h;
 
         self.last_solution = yi;
-        self.current_time = xi;
+        self.current_time = self.current_time + self.h;
 
         (self.current_time, &self.last_solution)
     }

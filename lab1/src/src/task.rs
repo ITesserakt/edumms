@@ -3,6 +3,21 @@ use std::ffi::c_void;
 use std::fmt::Debug;
 use std::slice;
 
+/// Cauchy task given in form
+/// ```math
+/// y'_1 = f_1(x, y_1, y_2, y_3, ..., y_n)
+/// y'_2 = f_2(x, y_1, y_2, y_3, ..., y_n)
+/// ...
+/// y'_n = f_n(x, y_1, y_2, y_3, ..., y_n)
+/// y_1(x_0) = y_01
+/// y_2(x_0) = y_02
+/// ...
+/// y_n(x_0) = y_0n
+/// ```
+///
+/// where array of f_i is [`Self::derivatives`], array y_0i is [`Self::initial_conditions`], 
+/// x_0 is [`Self::initial_time`].
+/// Because of that, [`Self`] parameterized by [T] and [N], such that f_i: [T] x [N]^n -> [N].
 pub struct CauchyTask<T, N> {
     pub(crate) size: usize,
     pub(crate) initial_conditions: Box<[N]>,
