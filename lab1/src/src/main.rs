@@ -66,7 +66,7 @@ fn main() -> Result<(), Error> {
 
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
-    let solver = unsafe { ExternalSolver::build(&CONFIG.general.lib_dir)? };
+    let solver = unsafe { ExternalSolver::build(&*LIBRARY)? };
     let stop = StopCondition::Timed {
         maximum: CONFIG.general.t_max,
     };

@@ -30,8 +30,8 @@ impl<'lib, T, N> ExternalSolver<'lib, T, N> {
     // OMG very unsafe code
     pub unsafe fn build(library: &'lib Library) -> Result<Self, Error> {
         Ok(Self {
-            symbol_next: library.get(b"solver_prepare\0")?,
-            symbol_prepare: library.get(b"solver_eval_next\0")?,
+            symbol_next: library.get(b"solver_eval_next\0")?,
+            symbol_prepare: library.get(b"solver_prepare\0")?,
         })
     }
 }
