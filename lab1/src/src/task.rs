@@ -27,8 +27,8 @@ pub struct CauchyTask<T, N> {
 #[repr(C)]
 pub struct Function<T, N> {
     state_pointer: *mut c_void,
-    fn_pointer: extern "C" fn(*const c_void, T, *const N) -> N,
-    destructor: extern "C" fn(*mut c_void),
+    fn_pointer: extern "C-unwind" fn(*const c_void, T, *const N) -> N,
+    destructor: extern "C-unwind" fn(*mut c_void),
 }
 
 impl<T, N> Function<T, N> {
@@ -37,7 +37,8 @@ impl<T, N> Function<T, N> {
         F: Fn(T, &[N; S]) -> N + 'static,
         N: Copy,
     {
-        extern "C" fn call_closure<F, T, N, const S: usize>(
+        #[inline]
+        extern "C-unwind" fn call_closure<F, T, N, const S: usize>(
             state: *const c_void,
             time: T,
             inputs: *const N,
@@ -47,6 +48,7 @@ impl<T, N> Function<T, N> {
         {
             // SAFETY: state pointer is managed by only this struct, thus never be null
             let state = unsafe { (state as *const F).as_ref() }.unwrap();
+            assert!(!inputs.is_null(), "Inputs is null");
             let inputs = unsafe { slice::from_raw_parts(inputs, S) };
             let inputs = inputs
                 .first_chunk::<S>()
@@ -54,7 +56,7 @@ impl<T, N> Function<T, N> {
             state(time, inputs)
         }
 
-        extern "C" fn call_destructor<F, T, N, const S: usize>(state: *mut c_void)
+        extern "C-unwind" fn call_destructor<F, T, N, const S: usize>(state: *mut c_void)
         where
             F: Fn(T, &[N; S]) -> N + 'static,
         {
