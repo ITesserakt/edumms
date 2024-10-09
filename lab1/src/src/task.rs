@@ -1,7 +1,7 @@
+use num_traits::Float;
 use std::ffi::c_void;
 use std::fmt::Debug;
 use std::slice;
-use num_traits::Float;
 
 pub struct CauchyTask<T, N> {
     pub(crate) size: usize,
@@ -14,7 +14,7 @@ pub struct CauchyTask<T, N> {
 pub struct Function<T, N> {
     state_pointer: *mut c_void,
     fn_pointer: extern "C" fn(*const c_void, T, *const N) -> N,
-    destructor: extern "C" fn(*mut c_void)
+    destructor: extern "C" fn(*mut c_void),
 }
 
 impl<T, N> Function<T, N> {
@@ -22,23 +22,32 @@ impl<T, N> Function<T, N> {
     where
         F: Fn(T, &[N; S]) -> N + 'static,
         N: Copy,
-        T: Float
+        T: Float,
     {
-        extern "C" fn call_closure<F, T, N, const S: usize>(state: *const c_void, time: T, inputs: *const N) -> N
+        extern "C" fn call_closure<F, T, N, const S: usize>(
+            state: *const c_void,
+            time: T,
+            inputs: *const N,
+        ) -> N
         where
-            F: Fn(T, &[N; S]) -> N + 'static
+            F: Fn(T, &[N; S]) -> N + 'static,
         {
             // SAFETY: state pointer is managed by only this struct, thus never be null
             let state = unsafe { (state as *const F).as_ref() }.unwrap();
             let inputs = unsafe { slice::from_raw_parts(inputs, S) };
-            let inputs = inputs.first_chunk::<S>().expect("Size of an input array should be equal to degree");
+            let inputs = inputs
+                .first_chunk::<S>()
+                .expect("Size of an input array should be equal to degree");
             state(time, inputs)
         }
-        
+
         extern "C" fn call_destructor<F, T, N, const S: usize>(state: *mut c_void)
         where
-            F: Fn(T, &[N; S]) -> N + 'static
+            F: Fn(T, &[N; S]) -> N + 'static,
         {
+            if size_of::<F>() == 0 {
+                return;
+            }
             // SAFETY: state pointer is managed by only this struct, thus never be null
             let _ = unsafe { Box::from_raw(state) };
         }
@@ -46,10 +55,10 @@ impl<T, N> Function<T, N> {
         Self {
             state_pointer: Box::into_raw(Box::new(f)) as *mut _,
             fn_pointer: call_closure::<F, T, N, S>,
-            destructor: call_destructor::<F, T, N, S>
+            destructor: call_destructor::<F, T, N, S>,
         }
     }
-    
+
     pub fn eval(&self, time: T, input: &[N]) -> N {
         (self.fn_pointer)(self.state_pointer, time, input.as_ptr())
     }
@@ -74,7 +83,7 @@ impl<T, N> CauchyTask<T, N> {
             size: S,
             derivatives: Box::new(derivatives),
             initial_conditions: Box::new(initial_conditions),
-            initial_time
+            initial_time,
         }
     }
 }
@@ -82,7 +91,7 @@ impl<T, N> CauchyTask<T, N> {
 pub fn f<T, N, const S: usize>(value: impl Fn(T, &[N; S]) -> N + 'static) -> Function<T, N>
 where
     N: Copy,
-    T: Float
+    T: Float,
 {
     Function::new(value)
 }

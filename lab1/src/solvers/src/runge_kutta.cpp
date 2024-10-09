@@ -26,31 +26,32 @@ public:
 
     N *next_solution(CauchyTask<T, N> task, T &out_time) override {
         auto view = task.get_functions();
+        auto size = view.size();
+        N temp[size], k1[size], k2[size], k3[size], k4[size];
 
-        for (std::size_t i = 0; i < view.size(); i++) {
-            auto &f = view[i];
-            N k1, k2, k3, k4;
-            buffer = last_solution;
+        for (std::size_t i = 0; i < size; i++) {
+            k1[i] = view[i](current_time, last_solution.data());
+            temp[i] = last_solution[i] + k1[i] * h / 2;
+        }
 
-            k1 = f(current_time, buffer.data());
+        for (std::size_t i = 0; i < size; i++) {
+            k2[i] = view[i](current_time + h / 2, temp);
+            temp[i] = last_solution[i] + k2[i] * h / 2;
+        }
 
-            for (std::size_t j = 0; j < view.size(); j++)
-                buffer[j] = last_solution[j] + k1 * h / 2;
-            k2 = f(current_time + h / 2, buffer.data());
+        for (std::size_t i = 0; i < size; i++) {
+            k3[i] = view[i](current_time + h / 2, temp);
+            temp[i] = last_solution[i] + k3[i] * h;
+        }
 
-            for (std::size_t j = 0; j < view.size(); j++)
-                buffer[j] = last_solution[j] + k2 * h / 2;
-            k3 = f(current_time + h / 2, buffer.data());
-
-            for (std::size_t j = 0; j < view.size(); j++)
-                buffer[j] = last_solution[j] + k3 * h;
-            k4 = f(current_time + h, buffer.data());
-
-            last_solution[i] += h / 6 * (k1 + 2 * k2 + 2 * k3 + k4);
+        for (std::size_t i = 0; i < size; i++) {
+            k4[i] = view[i](current_time + h, temp);
+            temp[i] = last_solution[i] + h / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
         }
 
         current_time += h;
         out_time = current_time;
+        std::copy(std::make_move_iterator(temp), std::make_move_iterator(temp + size), last_solution.begin());
         return last_solution.data();
     }
 };
@@ -58,15 +59,10 @@ public:
 template<typename T, typename N>
 static RungeKuttaSolver<T, N> GLOBAL_SOLVER;
 
-extern "C" double *solver_eval_next(
-    CauchyTask<double, double> task,
-    double *out_time
-) {
+extern "C" double *solver_eval_next(CauchyTask<double, double> task, double *out_time) {
     return GLOBAL_SOLVER<double, double>.next_solution(task, *out_time);
 }
 
-extern "C" void solver_prepare(
-    CauchyTask<double, double> task
-) {
+extern "C" void solver_prepare(CauchyTask<double, double> task) {
     GLOBAL_SOLVER<double, double>.prepare_for_task(task);
 }

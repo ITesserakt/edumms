@@ -12,6 +12,11 @@ public:
     N operator()(T time, const N* inputs) const {
         return fn_pointer(state_pointer, time, inputs);
     }
+
+    Function(const Function &other) = delete;
+    Function(Function &&other) noexcept = delete;
+    Function & operator=(const Function &other) = delete;
+    Function & operator=(Function &&other) noexcept = delete;
 };
 
 template<typename T, typename N>
