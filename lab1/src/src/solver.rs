@@ -3,19 +3,11 @@ use crate::task::CauchyTask;
 use anyhow::Error;
 use libloading::{Library, Symbol};
 
-/// Condition used to stop solver
-#[derive(Debug, Copy, Clone)]
-pub enum StopCondition<T> {
-    /// Specifies maximum time solver can compute
-    Timed { maximum: T },
-}
-
 pub trait Solver<T, N> {
-    fn solve_task(
+    fn solve_task<const S: usize>(
         self,
         task: &CauchyTask<T, N>,
-        stop_condition: StopCondition<T>,
-    ) -> Vec<(T, Box<[N]>)>;
+    ) -> impl Iterator<Item = (T, [N; S])>;
 
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]);
 }

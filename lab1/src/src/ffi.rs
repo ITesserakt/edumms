@@ -1,4 +1,4 @@
-use crate::solver::{ExternalSolver, Solver, StopCondition};
+use crate::solver::{ExternalSolver, Solver};
 use crate::task::{CauchyTask, Function};
 use std::iter::{once, repeat_with};
 use std::marker::PhantomData;
@@ -19,7 +19,8 @@ pub struct FFICauchyTask<'a, T, N> {
 }
 
 pub type SolverPrepareFn<T, N> = extern "C-unwind" fn(FFICauchyTask<T, N>);
-pub type SolverEvalNextFn<T, N> = extern "C-unwind" fn(FFICauchyTask<T, N>, out_time: *mut T) -> *const N;
+pub type SolverEvalNextFn<T, N> =
+    extern "C-unwind" fn(FFICauchyTask<T, N>, out_time: *mut T) -> *const N;
 
 impl<T, N> CauchyTask<T, N> {
     pub fn as_ffi(&self) -> FFICauchyTask<T, N>
@@ -39,33 +40,32 @@ impl<T, N> CauchyTask<T, N> {
 
 impl<T, N> Solver<T, N> for ExternalSolver<'_, T, N>
 where
-    T: Clone + PartialOrd + Default,
+    T: Clone + PartialOrd+ 'static,
     N: Clone,
 {
-    fn solve_task(
+    fn solve_task<const S: usize>(
         mut self,
         task: &CauchyTask<T, N>,
-        stop_condition: StopCondition<T>,
-    ) -> Vec<(T, Box<[N]>)> {
+    ) -> impl Iterator<Item = (T, [N; S])> {
+        assert_eq!(task.size, S, "Size of task should be equal to given size");
         (self.symbol_prepare)(task.as_ffi());
+        let initial_conditions = task.initial_conditions.first_chunk::<S>().unwrap();
 
-        once((task.initial_time.clone(), task.initial_conditions.clone()))
-            .chain(repeat_with(|| {
+        once((task.initial_time.clone(), initial_conditions.clone())).chain(repeat_with(
+            move || {
                 let (t, xs) = self.next_solution(task);
-                (t, Box::from(xs))
-            }))
-            .take_while(|(t, _)| match &stop_condition {
-                // t < 0 => t > maximum and
-                // t > 0 => t < maximum
-                StopCondition::Timed { maximum } => (t >= &T::default() || t > maximum) && (t <= &T::default() || t < maximum),
-            })
-            .collect()
+                let xs_fixed_size: &[N; S] = xs.try_into().unwrap();
+                (t, xs_fixed_size.clone())
+            },
+        ))
     }
 
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]) {
         let ffi = task.as_ffi();
         let mut t = MaybeUninit::uninit();
         let xs = (self.symbol_next)(ffi, t.as_mut_ptr());
+
+        assert!(!xs.is_null(), "Pointer is null");
         unsafe { (t.assume_init(), slice::from_raw_parts(xs, task.size)) }
     }
 }

@@ -4,9 +4,10 @@ pub mod plot;
 use crate::config::Config;
 use crate::plot::{Line, Plotter};
 use anyhow::Error;
+use itertools::Itertools;
 use libloading::{library_filename, Library};
 use plotters::prelude::{Color, BLUE, GREEN, RED};
-use project::solver::{ExternalSolver, Solver, StopCondition};
+use project::solver::{ExternalSolver, Solver};
 use project::task::{f, CauchyTask};
 use std::fs::File;
 use std::io::{Read, Write};
@@ -64,22 +65,19 @@ fn main() -> Result<(), Error> {
     );
 
     let mut output_file = File::create(CONFIG.general.output_dir.join("data.csv"))?;
-    let (mut ts, mut xs1, mut xs2, mut xs3) = (vec![], vec![], vec![], vec![]);
 
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
+    // OMG very unsafe code
     let solver = unsafe { ExternalSolver::build(&*LIBRARY)? };
-    let stop = StopCondition::Timed {
-        maximum: CONFIG.general.t_max,
-    };
 
-    for (t, xs) in solver.solve_task(&task, stop).into_iter() {
-        ts.push(t);
-        xs1.push(xs[0]);
-        xs2.push(xs[1]);
-        xs3.push(xs[2]);
-        writeln!(output_file, "{}, {}, {}, {}", t, xs[0], xs[1], xs[2])?;
-    }
+    // Compute sequence of solutions simultaneously writing them into csv file
+    let (ts, xs1, xs2, xs3): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = solver
+        .solve_task(&task)
+        .take_while(|(t, _): &(f64, _)| t.abs() <= CONFIG.general.t_max.abs())
+        .map(|(t, [x1, x2, x3])| (t, x1, x2, x3))
+        .inspect(|(t, x1, x2, x3)| writeln!(output_file, "{}, {}, {}, {}", t, x1, x2, x3).unwrap())
+        .multiunzip();
 
     Plotter::new(
         CONFIG.general.output_dir.join("plot.svg"),
