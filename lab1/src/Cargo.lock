@@ -597,7 +597,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "libloading",
- "num-traits",
  "ouroboros",
  "plotters",
 ]

@@ -1,4 +1,3 @@
-use num_traits::Float;
 use std::ffi::c_void;
 use std::fmt::Debug;
 use std::slice;
@@ -37,7 +36,6 @@ impl<T, N> Function<T, N> {
     where
         F: Fn(T, &[N; S]) -> N + 'static,
         N: Copy,
-        T: Float,
     {
         extern "C" fn call_closure<F, T, N, const S: usize>(
             state: *const c_void,
@@ -106,7 +104,6 @@ impl<T, N> CauchyTask<T, N> {
 pub fn f<T, N, const S: usize>(value: impl Fn(T, &[N; S]) -> N + 'static) -> Function<T, N>
 where
     N: Copy,
-    T: Float,
 {
     Function::new(value)
 }
