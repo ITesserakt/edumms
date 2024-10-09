@@ -37,7 +37,9 @@ static CONFIG: LazyLock<Config> = LazyLock::new(|| {
     config_file
         .read_to_string(&mut buffer)
         .expect("Could not read config file");
-    toml::from_str(&buffer).expect("Could not parse config file")
+    toml::from_str(&buffer)
+        .map_err(|e| format!("{} at {:?}", e.message(), e.span()))
+        .expect("Could not parse config file")
 });
 
 static LIBRARY: LazyLock<Library> = LazyLock::new(|| {
@@ -83,8 +85,8 @@ fn main() -> Result<(), Error> {
         CONFIG.general.output_dir.join("plot.svg"),
         CONFIG.plotting.plot_size,
         (
-            CONFIG.plotting.viewport_x.clone(),
-            CONFIG.plotting.viewport_y.clone(),
+            CONFIG.plotting.viewport.x.clone(),
+            CONFIG.plotting.viewport.y.clone(),
         ),
         [
             build_line(&ts, &xs1, &RED, "x_1", false),

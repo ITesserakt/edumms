@@ -14,7 +14,7 @@ class RungeKuttaSolver final : public Solver<T, N> {
     std::vector<N> buffer;
 
 public:
-    explicit RungeKuttaSolver(T step = 0.1) {
+    explicit RungeKuttaSolver(T step = 0.001) {
         this->h = step;
     }
 

@@ -39,7 +39,7 @@ impl<T, N> CauchyTask<T, N> {
 
 impl<T, N> Solver<T, N> for ExternalSolver<'_, T, N>
 where
-    T: Clone + PartialOrd,
+    T: Clone + PartialOrd + Default,
     N: Clone,
 {
     fn solve_task(
@@ -55,7 +55,9 @@ where
                 (t, Box::from(xs))
             }))
             .take_while(|(t, _)| match &stop_condition {
-                StopCondition::Timed { maximum } => t <= maximum,
+                // t < 0 => t > maximum and
+                // t > 0 => t < maximum
+                StopCondition::Timed { maximum } => (t >= &T::default() || t > maximum) && (t <= &T::default() || t < maximum),
             })
             .collect()
     }

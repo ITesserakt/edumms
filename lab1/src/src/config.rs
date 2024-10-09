@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    #[serde(default = "def_runtime")]
+    #[serde(default)]
     pub general: Runtime,
-    #[serde(default = "def_plotting")]
+    #[serde(default)]
     pub plotting: Plot
 }
 
@@ -22,11 +22,17 @@ pub struct Runtime {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct Viewport {
+    #[serde(default = "def_viewport")]
+    pub x: Range<f64>,
+    #[serde(default = "def_viewport")]
+    pub y: Range<f64>
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Plot {
-    #[serde(default = "def_viewport")]
-    pub viewport_x: Range<f64>,
-    #[serde(default = "def_viewport")]
-    pub viewport_y: Range<f64>,
+    #[serde(default)]
+    pub viewport: Viewport,
     #[serde(default = "def_plot_size")]
     pub plot_size: (u32, u32)
 }
@@ -51,28 +57,40 @@ fn def_t_max() -> f64 {
     1.0
 }
 
-fn def_runtime() -> Runtime {
-    Runtime {
-        t_max: def_t_max(),
-        output_dir: def_output_dir(),
-        lib_dir: def_lib_dir(),
-        solver: "euler".to_string()
+impl Default for Viewport {
+    fn default() -> Self {
+        Self {
+            x: def_viewport(),
+            y: def_viewport(),
+        }
     }
 }
 
-fn def_plotting() -> Plot {
-    Plot {
-        viewport_x: def_viewport(),
-        viewport_y: def_viewport(),
-        plot_size: def_plot_size(),
+impl Default for Plot {
+    fn default() -> Self {
+        Self {
+            viewport: Default::default(),
+            plot_size: def_plot_size(),
+        }
+    }
+}
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Self {
+            t_max: def_t_max(),
+            output_dir: def_output_dir(),
+            lib_dir: def_lib_dir(),
+            solver: "euler".to_string(),
+        }
     }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            general: def_runtime(),
-            plotting: def_plotting(),
+            general: Default::default(),
+            plotting: Default::default(),
         }
     }
 }
