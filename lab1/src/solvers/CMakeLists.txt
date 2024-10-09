@@ -9,3 +9,6 @@ target_include_directories(runge-kutta PUBLIC include/)
 
 add_library(euler SHARED src/euler.cpp)
 target_include_directories(euler PUBLIC include/)
+
+add_library(adams-bashforth SHARED src/adams_bashforth.cpp)
+target_include_directories(adams-bashforth PUBLIC include/)
