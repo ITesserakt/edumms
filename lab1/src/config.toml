@@ -1,2 +1,3 @@
 [general]
+lib_dir = "./solvers/solver.so"
 solver = "solver"

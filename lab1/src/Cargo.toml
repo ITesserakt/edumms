@@ -11,3 +11,4 @@ libloading = "0.8.5"
 plotters = "0.3.7"
 toml = { version = "0.8.19", features = ["parse"] }
 serde = { version = "1.0.210", features = ["derive"] }
+ouroboros = "0.18.4"
