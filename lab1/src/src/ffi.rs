@@ -18,13 +18,13 @@ pub struct FFICauchyTask<'a, T, N> {
     _phantom: PhantomData<&'a ()>,
 }
 
-pub type SolverPrepareFn<T, N> = extern "C" fn(FFICauchyTask<T, N>);
-pub type SolverEvalNextFn<T, N> = extern "C" fn(FFICauchyTask<T, N>, out_time: *mut T) -> *const N;
+pub type SolverPrepareFn<T, N> = extern "C-unwind" fn(FFICauchyTask<T, N>);
+pub type SolverEvalNextFn<T, N> = extern "C-unwind" fn(FFICauchyTask<T, N>, out_time: *mut T) -> *const N;
 
 impl<T, N> CauchyTask<T, N> {
     pub fn as_ffi(&self) -> FFICauchyTask<T, N>
     where
-        T: Clone
+        T: Clone,
     {
         FFICauchyTask {
             size: self.size,

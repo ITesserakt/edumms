@@ -1,16 +1,16 @@
+mod config;
 mod plot;
 
+use crate::config::Config;
 use crate::plot::{Line, Plotter};
 use anyhow::Error;
+use libloading::Library;
 use plotters::prelude::{Color, BLUE, GREEN, RED};
 use project::solver::{ExternalSolver, Solver, StopCondition};
 use project::task::{f, CauchyTask};
 use std::fs::File;
-use std::io::Write;
-use std::ops::Range;
-use std::path::PathBuf;
+use std::io::{Read, Write};
 use std::sync::LazyLock;
-use libloading::Library;
 
 fn build_line(
     xs: &[f64],
@@ -27,11 +27,25 @@ fn build_line(
     )
 }
 
-const RUN_TIME: f64 = 10.0;
-const VIEWPORT_SIZE: (Range<f64>, Range<f64>) = (-0.1..RUN_TIME + 0.1, -0.1..1.1);
-const PLOT_SIZE: (u32, u32) = (640, 480);
-const ARTIFACT_NAME: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("./out/plot"));
-const SOLVER_PATH: &'static str = "solvers/solver.so";
+const CONFIG_PATH: &'static str = "config.toml";
+
+static CONFIG: LazyLock<Config> = LazyLock::new(|| {
+    let Ok(mut config_file) = File::open(CONFIG_PATH) else {
+        return Config::default();
+    };
+    let mut buffer = String::new();
+    config_file
+        .read_to_string(&mut buffer)
+        .expect("Could not read config file");
+    toml::from_str(&buffer).expect("Could not parse config file")
+});
+
+static LIBRARY: LazyLock<Library> = LazyLock::new(|| {
+    let mut path = CONFIG.general.lib_dir.clone();
+    path.push(&CONFIG.general.solver);
+    let solver_lib_path = path.with_extension("so");
+    unsafe { Library::new(solver_lib_path).expect("Could not load solver library") }
+});
 
 fn main() -> Result<(), Error> {
     let k1 = 0.577;
@@ -47,14 +61,15 @@ fn main() -> Result<(), Error> {
         [1.0, 0.0, 0.0],
     );
 
-    let mut output_file = File::create(ARTIFACT_NAME.with_extension("csv"))?;
+    let mut output_file = File::create(CONFIG.general.output_dir.join("data.csv"))?;
     let (mut ts, mut xs1, mut xs2, mut xs3) = (vec![], vec![], vec![], vec![]);
 
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
-    let library = unsafe { Library::new(SOLVER_PATH)? };
-    let solver = unsafe { ExternalSolver::build(&library)? };
-    let stop = StopCondition::Timed { maximum: RUN_TIME };
+    let solver = unsafe { ExternalSolver::build(&LIBRARY)? };
+    let stop = StopCondition::Timed {
+        maximum: CONFIG.general.t_max,
+    };
 
     for (t, xs) in solver.solve_task(&task, stop).into_iter() {
         ts.push(t);
@@ -65,9 +80,12 @@ fn main() -> Result<(), Error> {
     }
 
     Plotter::new(
-        ARTIFACT_NAME.with_extension("svg"),
-        PLOT_SIZE,
-        VIEWPORT_SIZE,
+        CONFIG.general.output_dir.join("plot.svg"),
+        CONFIG.plotting.plot_size,
+        (
+            CONFIG.plotting.viewport_x.clone(),
+            CONFIG.plotting.viewport_y.clone(),
+        ),
         [
             build_line(&ts, &xs1, &RED, "x_1", false),
             build_line(&ts, &xs2, &GREEN, "x_2", false),
