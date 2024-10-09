@@ -10,6 +10,7 @@ use std::io::Write;
 use std::ops::Range;
 use std::path::PathBuf;
 use std::sync::LazyLock;
+use libloading::Library;
 
 fn build_line(
     xs: &[f64],
@@ -51,7 +52,8 @@ fn main() -> Result<(), Error> {
 
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
-    let solver = unsafe { ExternalSolver::build(SOLVER_PATH)? };
+    let library = unsafe { Library::new(SOLVER_PATH)? };
+    let solver = unsafe { ExternalSolver::build(&library)? };
     let stop = StopCondition::Timed { maximum: RUN_TIME };
 
     for (t, xs) in solver.solve_task(&task, stop).into_iter() {

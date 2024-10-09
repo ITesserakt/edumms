@@ -18,49 +18,41 @@ pub struct FFICauchyTask<'a, T, N> {
     _phantom: PhantomData<&'a ()>,
 }
 
-pub type SolverPrepareFn<T, N> = unsafe extern "C-unwind" fn(FFICauchyTask<T, N>);
-pub type SolverEvalNextFn<T, N> =
-    unsafe extern "C-unwind" fn(FFICauchyTask<T, N>, out_time: *mut T) -> *const N;
+pub type SolverPrepareFn<T, N> = extern "C" fn(FFICauchyTask<T, N>);
+pub type SolverEvalNextFn<T, N> = extern "C" fn(FFICauchyTask<T, N>, out_time: *mut T) -> *const N;
 
-impl<T, N> From<&CauchyTask<T, N>> for FFICauchyTask<'_, T, N>
-where
-    T: Clone,
-{
-    fn from(value: &CauchyTask<T, N>) -> Self {
-        Self {
-            size: value.size,
-            initial_time: value.initial_time.clone(),
+impl<T, N> CauchyTask<T, N> {
+    pub fn as_ffi(&self) -> FFICauchyTask<T, N>
+    where
+        T: Clone
+    {
+        FFICauchyTask {
+            size: self.size,
+            initial_time: self.initial_time.clone(),
             // Lifetime '_ ensures that this pointers will be alive
-            derivatives: value.derivatives.as_ptr(),
-            initial_conditions: value.initial_conditions.as_ptr(),
+            derivatives: self.derivatives.as_ptr(),
+            initial_conditions: self.initial_conditions.as_ptr(),
             _phantom: PhantomData,
         }
     }
 }
 
-impl<T, N> Solver<T, N> for ExternalSolver<T, N>
+impl<T, N> Solver<T, N> for ExternalSolver<'_, T, N>
 where
     T: Clone + PartialOrd,
     N: Clone,
 {
     fn solve_task(
-        self,
+        mut self,
         task: &CauchyTask<T, N>,
         stop_condition: StopCondition<T>,
     ) -> Vec<(T, Box<[N]>)> {
-        let ffi: FFICauchyTask<T, N> = task.into();
-        self.with_symbol_prepare(|s| unsafe { s(ffi.clone()) });
+        (self.symbol_prepare)(task.as_ffi());
 
         once((task.initial_time.clone(), task.initial_conditions.clone()))
-            .chain(repeat_with(move || {
-                let mut t = MaybeUninit::uninit();
-                let xs = self.with_symbol_next(|s| unsafe { s(ffi.clone(), t.as_mut_ptr()) });
-                unsafe {
-                    (
-                        t.assume_init(),
-                        Box::<[N]>::from(slice::from_raw_parts(xs, task.size)),
-                    )
-                }
+            .chain(repeat_with(|| {
+                let (t, xs) = self.next_solution(task);
+                (t, Box::from(xs))
             }))
             .take_while(|(t, _)| match &stop_condition {
                 StopCondition::Timed { maximum } => t <= maximum,
@@ -69,9 +61,9 @@ where
     }
 
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]) {
-        let ffi = task.into();
+        let ffi = task.as_ffi();
         let mut t = MaybeUninit::uninit();
-        let xs = self.with_symbol_next(|s| unsafe { s(ffi, t.as_mut_ptr()) });
+        let xs = (self.symbol_next)(ffi, t.as_mut_ptr());
         unsafe { (t.assume_init(), slice::from_raw_parts(xs, task.size)) }
     }
 }

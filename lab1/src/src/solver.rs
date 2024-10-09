@@ -2,8 +2,6 @@ use crate::ffi::{SolverEvalNextFn, SolverPrepareFn};
 use crate::task::CauchyTask;
 use anyhow::Error;
 use libloading::{Library, Symbol};
-use ouroboros::self_referencing;
-use std::ffi::OsStr;
 
 /// Condition used to stop solver
 #[derive(Debug, Copy, Clone)]
@@ -22,25 +20,18 @@ pub trait Solver<T, N> {
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]);
 }
 
-#[self_referencing]
-pub struct ExternalSolver<T: 'static, N: 'static> {
-    library: Library,
-    #[borrows(library)]
-    #[covariant]
-    pub(crate) symbol_prepare: Symbol<'this, SolverPrepareFn<T, N>>,
-    #[borrows(library)]
-    #[covariant]
-    pub(crate) symbol_next: Symbol<'this, SolverEvalNextFn<T, N>>,
+#[derive(Debug)]
+pub struct ExternalSolver<'lib, T, N> {
+    pub(crate) symbol_prepare: Symbol<'lib, SolverPrepareFn<T, N>>,
+    pub(crate) symbol_next: Symbol<'lib, SolverEvalNextFn<T, N>>,
 }
 
-impl<T, N> ExternalSolver<T, N> {
+impl<'lib, T, N> ExternalSolver<'lib, T, N> {
     // OMG very unsafe code
-    pub unsafe fn build(external_library_path: impl AsRef<OsStr>) -> Result<Self, Error> {
-        let this = Self::try_new(
-            Library::new(external_library_path)?,
-            |lib| lib.get(b"solver_prepare\0"),
-            |lib| lib.get(b"solver_eval_next\0"),
-        )?;
-        Ok(this)
+    pub unsafe fn build(library: &'lib Library) -> Result<Self, Error> {
+        Ok(Self {
+            symbol_next: library.get(b"solver_prepare\0")?,
+            symbol_prepare: library.get(b"solver_eval_next\0")?,
+        })
     }
 }
