@@ -155,7 +155,7 @@ fn main() -> Result<(), Error> {
         .into_iter()
         .flatten(),
     )
-    .draw(CONFIG.general.output_type)?;
+    .draw(CONFIG.plotting.output_type)?;
 
     Ok(())
 }

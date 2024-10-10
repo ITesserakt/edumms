@@ -19,8 +19,6 @@ pub struct Runtime {
     #[serde(default = "def_lib_dir")]
     pub lib_dir: PathBuf,
     pub solver: String,
-    #[serde(default)]
-    pub output_type: Output
 }
 
 #[derive(Serialize, Deserialize, Default, Copy, Clone)]
@@ -44,7 +42,9 @@ pub struct Plot {
     #[serde(default)]
     pub viewport: Viewport,
     #[serde(default = "def_plot_size")]
-    pub plot_size: (u32, u32)
+    pub plot_size: (u32, u32),
+    #[serde(default)]
+    pub output_type: Output
 }
 
 fn def_plot_size() -> (u32, u32) {
@@ -81,6 +81,7 @@ impl Default for Plot {
         Self {
             viewport: Default::default(),
             plot_size: def_plot_size(),
+            output_type: Default::default()
         }
     }
 }
@@ -92,7 +93,6 @@ impl Default for Runtime {
             output_dir: def_output_dir(),
             lib_dir: def_lib_dir(),
             solver: "builtin".to_string(),
-            output_type: Default::default()
         }
     }
 }
