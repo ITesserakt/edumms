@@ -91,7 +91,7 @@ impl Default for Runtime {
             t_max: def_t_max(),
             output_dir: def_output_dir(),
             lib_dir: def_lib_dir(),
-            solver: "euler".to_string(),
+            solver: "builtin".to_string(),
             output_type: Default::default()
         }
     }

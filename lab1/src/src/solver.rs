@@ -16,6 +16,11 @@ pub struct EulerSolver<T, N> {
     last_solution: Box<[N]>,
 }
 
+pub enum Either<S1, S2> {
+    Left(S1),
+    Right(S2)
+}
+
 impl<T: Default, N> EulerSolver<T, N> {
     pub fn new(step: T) -> Self {
         Self {
@@ -61,5 +66,40 @@ where
         self.last_solution = xs;
         self.current_time = self.current_time + self.step;
         (self.current_time, &self.last_solution)
+    }
+}
+
+impl<S1, S2, T, N> Solver<T, N> for Either<S1, S2>
+where
+    S1: Solver<T, N>,
+    S2: Solver<T, N>
+{
+    fn solve_task<const S: usize>(self, task: &CauchyTask<T, N>) -> impl Iterator<Item=(T, [N; S])> {
+        match self {
+            Either::Left(x) => Either::Left(x.solve_task(task)),
+            Either::Right(x) => Either::Right(x.solve_task(task)),
+        }
+    }
+
+    fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]) {
+        match self {
+            Either::Left(x) => x.next_solution(task),
+            Either::Right(x) => x.next_solution(task)
+        }
+    }
+}
+
+impl<I1, I2, T> Iterator for Either<I1, I2>
+where 
+    I1: Iterator<Item = T>,
+    I2: Iterator<Item = T>
+{
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Either::Left(x) => x.next(),
+            Either::Right(x) => x.next()
+        }
     }
 }
