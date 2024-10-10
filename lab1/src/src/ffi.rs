@@ -6,6 +6,7 @@ use std::iter::{once, repeat_with};
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::slice;
+use crate::interval::Interval;
 
 #[repr(C)]
 struct CauchyTaskRef<'a, T, N> {
@@ -32,6 +33,22 @@ impl CanSolve<f32, f32> for ExternalSolver<'_, f32, f32> {
 
 impl CanSolve<f64, f64> for ExternalSolver<'_, f64, f64> {
     const SUFFIX: &'static [u8] = b"f64_f64";
+}
+
+impl CanSolve<f64, Interval<f64>> for ExternalSolver<'_, f64, Interval<f64>> {
+    const SUFFIX: &'static [u8] = b"f64_If64";
+}
+
+impl CanSolve<f64, Interval<f32>> for ExternalSolver<'_, f64, Interval<f32>> {
+    const SUFFIX: &'static [u8] = b"f64_If32";
+}
+
+impl CanSolve<f32, Interval<f64>> for ExternalSolver<'_, f32, Interval<f64>> {
+    const SUFFIX: &'static [u8] = b"f32_If64";
+}
+
+impl CanSolve<f32, Interval<f32>> for ExternalSolver<'_, f32, Interval<f32>> {
+    const SUFFIX: &'static [u8] = b"f32_If32";
 }
 
 impl<'lib, T, N> ExternalSolver<'lib, T, N>

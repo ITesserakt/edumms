@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "ffi.h"
+#include "interval.h"
 
 template<typename T, typename N>
 struct Solver {
@@ -27,3 +28,7 @@ extern std::unique_ptr<Solver<T, N> > GLOBAL_SOLVER;
 
 gen_binding(GLOBAL_SOLVER, double, double, f64_f64)
 gen_binding(GLOBAL_SOLVER, float, float, f32_f32)
+gen_binding(GLOBAL_SOLVER, double, Interval<double>, f64_If64)
+gen_binding(GLOBAL_SOLVER, float, Interval<double>, f32_If64)
+gen_binding(GLOBAL_SOLVER, double, Interval<float>, f64_If32)
+gen_binding(GLOBAL_SOLVER, float, Interval<float>, f32_If32)
