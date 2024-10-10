@@ -4,29 +4,57 @@ pub mod plot;
 use crate::config::Config;
 use crate::plot::{Line, Plotter};
 use anyhow::Error;
-use itertools::Itertools;
 use libloading::{library_filename, Library};
-use plotters::prelude::{Color, BLUE, GREEN, RED};
-use project::ffi::ExternalSolver;
+use plotters::prelude::{Color, ShapeStyle, BLUE, GREEN, RED};
+use project::ffi::{CanSolve, ExternalSolver};
+use project::interval::Interval;
+use project::solution::{Solution, StopCondition};
 use project::solver::{Either, EulerSolver, Solver};
 use project::task::{f, CauchyTask};
+use project::Frozen;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::ops::{Add, Mul, Neg, Sub};
 use std::sync::LazyLock;
 
 fn build_line(
     xs: &[f64],
     ys: &[f64],
-    color: impl Color,
+    color: impl Into<ShapeStyle>,
     label: impl Into<String>,
-    dashed: bool,
-) -> Line {
-    Line::new(
+) -> Vec<Line> {
+    vec![Line::new(
         xs.iter().cloned().zip(ys.iter().cloned()),
         color,
         label,
-        dashed,
-    )
+        false,
+    )]
+}
+
+fn build_line_interval(
+    xs: &[f64],
+    ys: &[Interval<f64>],
+    color: impl Color + Clone,
+    label: impl Into<String> + Clone,
+    dashed: bool,
+) -> Vec<Line> {
+    let start_color = color.mix(0.5);
+    let end_color = color.mix(0.5);
+
+    vec![
+        Line::new(
+            xs.iter().cloned().zip(ys.iter().map(|it| it.start())),
+            start_color,
+            label.clone(),
+            dashed,
+        ),
+        Line::new(
+            xs.iter().cloned().zip(ys.iter().map(|it| it.end())),
+            end_color,
+            label,
+            dashed,
+        ),
+    ]
 }
 
 const CONFIG_PATH: &'static str = "config.toml";
@@ -51,39 +79,64 @@ static LIBRARY: LazyLock<Library> = LazyLock::new(|| {
     unsafe { Library::new(path).expect("Could not load solver library") }
 });
 
-fn main() -> Result<(), Error> {
-    let k1 = 0.577;
-    let k2 = 0.422;
-
-    let task = CauchyTask::new(
+fn get_task<N>(coeffs: [N; 2]) -> CauchyTask<f64, N>
+where
+    N: From<f64> + Copy + Neg<Output = N> + Mul<Output = N> + Sub<Output = N> + 'static,
+{
+    CauchyTask::new(
         [
-            f(move |_, [x1, _, _]| -k1 * x1),
-            f(move |_, [x1, x2, _]| k1 * x1 - k2 * x2),
-            f(move |_, [_, x2, _]| k2 * x2),
+            f(move |_, &[x1, _, _]| -coeffs[0] * x1),
+            f(move |_, &[x1, x2, _]| coeffs[0] * x1 - coeffs[1] * x2),
+            f(move |_, &[_, x2, _]| coeffs[1] * x2),
         ],
         0.0,
-        [1.0, 0.0, 0.0],
-    );
+        [1.0, 0.0, 0.0].map(N::from),
+    )
+}
 
-    let mut output_file = File::create(CONFIG.general.output_dir.join("data.csv"))?;
-
-    // Write csv header
-    writeln!(&mut output_file, "t, x1, x2, x3")?;
-    // OMG very unsafe code
-    let solver = if CONFIG.general.solver == "builtin" {
+fn get_solver<N>() -> Frozen<impl Solver<f64, N>>
+where
+    for<'a> ExternalSolver<'a, f64, N>: CanSolve<f64, N>,
+    N: Clone + Add<Output = N> + 'static,
+    f64: Mul<N, Output = N>,
+{
+    if CONFIG.general.solver == "builtin" {
         Either::Left(EulerSolver::new(0.1))
     } else {
-        Either::Right(unsafe { ExternalSolver::build(&*LIBRARY) }?)
-    };
+        Either::Right(unsafe { ExternalSolver::build(&*LIBRARY) }.expect("Cannot build solver"))
+    }
+    .rewrap()
+}
 
-    // Compute sequence of solutions simultaneously writing them into csv file
-    let (ts, xs1, xs2, xs3): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = solver
-        .solve_task(&task)
-        .take_while(|(t, _): &(f64, _)| t.abs() <= CONFIG.general.t_max.abs())
-        .map(|(t, [x1, x2, x3])| (t, x1, x2, x3))
-        .inspect(|(t, x1, x2, x3)| writeln!(output_file, "{}, {}, {}, {}", t, x1, x2, x3).unwrap())
-        .multiunzip();
+fn main() -> Result<(), Error> {
+    let solution_interval = Solution::compute(
+        get_solver().as_mut(),
+        &get_task([Interval::new(0.576, 0.578), Interval::from(0.422)]),
+        StopCondition::Timed {
+            maximum: CONFIG.general.t_max,
+        },
+    );
 
+    let solution_bench = Solution::compute(
+        get_solver().as_mut(),
+        &get_task([0.577, 0.422]),
+        StopCondition::Timed {
+            maximum: CONFIG.general.t_max,
+        },
+    );
+
+    // Save csv file with computed values
+    let mut csv_output_file = File::create(CONFIG.general.output_dir.join("data.csv"))?;
+    writeln!(csv_output_file, "t, x1, x2, x3")?;
+    for (idx, t) in solution_bench.time().iter().enumerate() {
+        writeln!(
+            csv_output_file,
+            "{}, {}, {}, {}",
+            t, solution_bench[0][idx], solution_bench[1][idx], solution_bench[2][idx]
+        )?;
+    }
+
+    let ts = solution_bench.time();
     Plotter::new(
         CONFIG.general.output_dir.join("plot.svg"),
         CONFIG.plotting.plot_size,
@@ -92,10 +145,15 @@ fn main() -> Result<(), Error> {
             CONFIG.plotting.viewport.y.clone(),
         ),
         [
-            build_line(&ts, &xs1, &RED, "x_1", false),
-            build_line(&ts, &xs2, &GREEN, "x_2", false),
-            build_line(&ts, &xs3, &BLUE, "x_3", false),
-        ],
+            build_line_interval(ts, &solution_interval[0], &RED, "x_1", false),
+            build_line_interval(ts, &solution_interval[1], &GREEN, "x_2", false),
+            build_line_interval(ts, &solution_interval[2], &BLUE, "x_3", false),
+            build_line(ts, &solution_bench[0], RED.stroke_width(2), "x_1"),
+            build_line(ts, &solution_bench[1], GREEN.stroke_width(2), "x_1"),
+            build_line(ts, &solution_bench[2], BLUE.stroke_width(2), "x_1"),
+        ]
+        .into_iter()
+        .flatten(),
     )
     .draw(CONFIG.general.output_type)?;
 

@@ -1,5 +1,4 @@
 use std::ffi::c_void;
-use std::fmt::Debug;
 use std::slice;
 
 /// Cauchy task given in form
@@ -91,8 +90,6 @@ impl<T, N> CauchyTask<T, N> {
         initial_time: T,
         initial_conditions: [N; S],
     ) -> Self
-    where
-        N: Copy + PartialEq + Debug + 'static,
     {
         Self {
             size: S,

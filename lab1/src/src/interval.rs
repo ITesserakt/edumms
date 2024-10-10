@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
-use itertools::{Itertools, MinMaxResult};
 use std::ops::{Add, Div, Mul, Neg, Sub};
+use itertools::{Itertools, MinMaxResult};
 
 #[derive(Debug, Default, Hash, Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
 #[repr(C)]
@@ -14,6 +14,8 @@ impl<T> Interval<T> {
     pub fn into_inner(self) -> (T, T) {
         (self.0, self.1)
     }
+    pub fn start(self) -> T { self.0 }
+    pub fn end(self) -> T { self.1 }
 }
 
 impl<T: Add> Add for Interval<T> {
@@ -53,6 +55,14 @@ where
             MinMaxResult::NoElements => unreachable!(),
             MinMaxResult::OneElement(value) => Interval::from(value),
         }
+    }
+}
+
+impl Mul<Interval<f64>> for f64 {
+    type Output = Interval<f64>;
+
+    fn mul(self, rhs: Interval<f64>) -> Self::Output {
+        Interval(rhs.0 * self, rhs.1 * self)
     }
 }
 

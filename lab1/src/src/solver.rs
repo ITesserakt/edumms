@@ -1,11 +1,12 @@
 use crate::task::CauchyTask;
 use std::iter::{once, repeat_with};
+use crate::Frozen;
 
-pub trait Solver<T, N> {
-    fn solve_task<const S: usize>(
-        self,
+pub trait Solver<T, N>: Sized {
+    fn solve_task(
+        this: Frozen<&mut Self>,
         task: &CauchyTask<T, N>,
-    ) -> impl Iterator<Item = (T, [N; S])>;
+    ) -> impl Iterator<Item = (T, Box<[N]>)>;
 
     fn next_solution(&mut self, task: &CauchyTask<T, N>) -> (T, &[N]);
 }
@@ -22,11 +23,20 @@ pub enum Either<S1, S2> {
 }
 
 impl<T: Default, N> EulerSolver<T, N> {
-    pub fn new(step: T) -> Self {
-        Self {
+    pub fn new(step: T) -> Frozen<Self> {
+        Frozen(Self {
             step,
             current_time: T::default(),
             last_solution: Box::new([]),
+        })
+    }
+}
+
+impl<S1, S2> Either<Frozen<S1>, Frozen<S2>> {
+    pub fn rewrap(self) -> Frozen<Either<S1, S2>> {
+        match self {
+            Either::Left(x) => Frozen(Either::Left(x.0)),
+            Either::Right(x) => Frozen(Either::Right(x.0))
         }
     }
 }
@@ -36,22 +46,23 @@ where
     T: Copy + std::ops::Mul<N> + std::ops::Add<Output = T>,
     N: Clone + std::ops::Add<<T as std::ops::Mul<N>>::Output, Output = N>,
 {
-    fn solve_task<const S: usize>(
-        mut self,
+    fn solve_task(
+        this: Frozen<&mut Self>,
         task: &CauchyTask<T, N>,
-    ) -> impl Iterator<Item = (T, [N; S])> {
-        assert_eq!(task.size, S, "Task size should be equal to given size");
-        self.current_time = task.initial_time;
-        self.last_solution = task.initial_conditions.clone();
+    ) -> impl Iterator<Item = (T, Box<[N]>)> {
+        let this = this.init(|it| {
+            it.current_time = task.initial_time;
+            it.last_solution = task.initial_conditions.clone();
+        });
 
         once((
-            self.current_time,
-            self.last_solution.first_chunk().unwrap().clone(),
+            this.current_time,
+            this.last_solution.clone(),
         ))
         .chain(repeat_with(move || {
-            let (t, xs) = self.next_solution(task);
-            let xs = xs.first_chunk().unwrap();
-            (t, xs.clone())
+            let (t, xs) = this.next_solution(task);
+            assert_eq!(task.size, xs.len(), "Task size should be equal to outputs size");
+            (t, Box::from(xs))
         }))
     }
 
@@ -74,10 +85,10 @@ where
     S1: Solver<T, N>,
     S2: Solver<T, N>
 {
-    fn solve_task<const S: usize>(self, task: &CauchyTask<T, N>) -> impl Iterator<Item=(T, [N; S])> {
-        match self {
-            Either::Left(x) => Either::Left(x.solve_task(task)),
-            Either::Right(x) => Either::Right(x.solve_task(task)),
+    fn solve_task(this: Frozen<&mut Self>, task: &CauchyTask<T, N>) -> impl Iterator<Item=(T, Box<[N]>)> {
+        match this.0 {
+            Either::Left(x) => Either::Left(Solver::solve_task(Frozen(x), task)),
+            Either::Right(x) => Either::Right(Solver::solve_task(Frozen(x), task)),
         }
     }
 

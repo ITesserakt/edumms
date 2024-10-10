@@ -1,4 +1,4 @@
-use crate::solver::Solver;
+use crate::solver::{Solver};
 use crate::task::{CauchyTask, Function};
 use anyhow::Error;
 use libloading::{Library, Symbol};
@@ -6,6 +6,7 @@ use std::iter::{once, repeat_with};
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::slice;
+use crate::Frozen;
 use crate::interval::Interval;
 
 #[repr(C)]
@@ -55,7 +56,7 @@ impl<'lib, T, N> ExternalSolver<'lib, T, N>
 where
     Self: CanSolve<T, N>,
 {
-    pub unsafe fn build(library: &'lib Library) -> Result<Self, Error> {
+    pub unsafe fn build(library: &'lib Library) -> Result<Frozen<Self>, Error> {
         let mut buffer = vec![];
         buffer.extend_from_slice(b"solver_prepare_");
         buffer.extend_from_slice(Self::SUFFIX);
@@ -66,11 +67,11 @@ where
         buffer.extend_from_slice(Self::SUFFIX);
         buffer.push(0);
 
-        Ok(Self {
+        Ok(Frozen(Self {
             prepare,
             next: library.get(buffer.as_slice())?,
             _phantom: Default::default(),
-        })
+        }))
     }
 }
 
@@ -94,20 +95,18 @@ where
     T: Clone,
     N: Clone,
 {
-    fn solve_task<const S: usize>(
-        mut self,
+    fn solve_task(
+        this: Frozen<&mut Self>,
         task: &CauchyTask<T, N>,
-    ) -> impl Iterator<Item = (T, [N; S])> {
-        assert_eq!(task.size, S, "Task size should be equal to given size");
+    ) -> impl Iterator<Item = (T, Box<[N]>)> {
         let ffi = task.as_ffi();
-        (self.prepare)(ffi);
-
-        let initial = task.initial_conditions.first_chunk().unwrap();
-        once((task.initial_time.clone(), initial.clone()))
+        let this = this.init(|it| (it.prepare)(ffi));
+        
+        once((task.initial_time.clone(), task.initial_conditions.clone()))
             .chain(repeat_with(move || {
-                let (t, xs) = self.next_solution(task);
-                let xs = xs.first_chunk().unwrap();
-                (t, xs.clone())
+                let (t, xs) = this.next_solution(task);
+                assert_eq!(task.size, xs.len(), "Task size should be equal to outputs size");
+                (t, Box::from(xs))
             }))
     }
 
