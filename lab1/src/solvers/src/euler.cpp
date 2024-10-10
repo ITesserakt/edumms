@@ -15,14 +15,14 @@ public:
     }
 
     void prepare_for_task(CauchyTask<T, N> task) override {
-        auto view = task.get_initial_conditions();
-        current_time = task.get_initial_time();
-        last_solution = std::vector<N>{view.begin(), view.end()};
+        auto view = task.initial_conditions;
+        current_time = task.initial_time;
+        last_solution = std::vector<N>{view, view + task.size};
     }
 
     N *next_solution(CauchyTask<T, N> task, T &out_time) override {
-        auto view = task.get_functions();
-        auto size = view.size();
+        auto view = task.derivatives;
+        auto size = task.size;
         auto result = new N[size];
 
         for (std::size_t i = 0; i < size; i++) {
@@ -39,12 +39,4 @@ public:
 };
 
 template<typename T, typename N>
-static EulerSolver<T, N> GLOBAL_SOLVER;
-
-extern "C" double *solver_eval_next(CauchyTask<double, double> task, double *out_time) {
-    return GLOBAL_SOLVER<double, double>.next_solution(task, *out_time);
-}
-
-extern "C" void solver_prepare(CauchyTask<double, double> task) {
-    GLOBAL_SOLVER<double, double>.prepare_for_task(task);
-}
+std::unique_ptr<Solver<T, N>> GLOBAL_SOLVER = std::make_unique<EulerSolver<T, N>>();

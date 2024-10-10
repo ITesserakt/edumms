@@ -7,11 +7,12 @@ use anyhow::Error;
 use itertools::Itertools;
 use libloading::{library_filename, Library};
 use plotters::prelude::{Color, BLUE, GREEN, RED};
-use project::solver::{ExternalSolver, Solver};
+use project::solver::{EulerSolver, Solver};
 use project::task::{f, CauchyTask};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::LazyLock;
+use project::ffi::ExternalSolver;
 
 fn build_line(
     xs: &[f64],
@@ -69,7 +70,7 @@ fn main() -> Result<(), Error> {
     // Write csv header
     writeln!(&mut output_file, "t, x1, x2, x3")?;
     // OMG very unsafe code
-    let solver = unsafe { ExternalSolver::build(&*LIBRARY)? };
+    let solver = EulerSolver::new(0.1);
 
     // Compute sequence of solutions simultaneously writing them into csv file
     let (ts, xs1, xs2, xs3): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) = solver

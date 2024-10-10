@@ -19,14 +19,14 @@ public:
     }
 
     void prepare_for_task(CauchyTask<T, N> task) override {
-        auto view = task.get_initial_conditions();
-        last_solution = std::vector<N>{view.begin(), view.end()};
-        current_time = task.get_initial_time();
+        auto view = task.initial_conditions;
+        last_solution = std::vector<N>{view, view + task.size};
+        current_time = task.initial_time;
     }
 
     N *next_solution(CauchyTask<T, N> task, T &out_time) override {
-        auto view = task.get_functions();
-        auto size = view.size();
+        auto view = task.derivatives;
+        auto size = task.size;
         auto temp = new N[size * 5];
         auto result = temp, k1 = &temp[size], k2 = &temp[size * 2], k3 = &temp[size * 3], k4 = &temp[size * 4];
 
@@ -60,12 +60,4 @@ public:
 };
 
 template<typename T, typename N>
-static RungeKuttaSolver<T, N> GLOBAL_SOLVER;
-
-extern "C" double *solver_eval_next(CauchyTask<double, double> task, double *out_time) {
-    return GLOBAL_SOLVER<double, double>.next_solution(task, *out_time);
-}
-
-extern "C" void solver_prepare(CauchyTask<double, double> task) {
-    GLOBAL_SOLVER<double, double>.prepare_for_task(task);
-}
+std::unique_ptr<Solver<T, N>> GLOBAL_SOLVER = std::make_unique<RungeKuttaSolver<T, N>>();

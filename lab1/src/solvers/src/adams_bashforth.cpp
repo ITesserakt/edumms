@@ -13,14 +13,14 @@ public:
     }
 
     void prepare_for_task(CauchyTask<T, N> task) override {
-        auto cond_view = task.get_initial_conditions();
-        current_time[0] = task.get_initial_time();
-        last_solution[0] = {cond_view.begin(), cond_view.end()};
+        auto cond_view = task.initial_conditions;
+        current_time[0] = task.initial_time;
+        last_solution[0] = {cond_view, cond_view + task.size};
 
         // Do one step with Euler method to populate last_solution[1]
-        auto view = task.get_functions();
-        last_solution[1].resize(view.size());
-        for (std::size_t i = 0; i < view.size(); ++i) {
+        auto view = task.derivatives;
+        last_solution[1].resize(task.size);
+        for (std::size_t i = 0; i < task.size; ++i) {
             auto &f = view[i];
             last_solution[1][i] = last_solution[0][i] + h * f(current_time[0], last_solution[0].data());
         }
@@ -28,8 +28,8 @@ public:
     }
 
     N *next_solution(CauchyTask<T, N> task, T &out_time) override {
-        auto view = task.get_functions();
-        auto size = view.size();
+        auto view = task.derivatives;
+        auto size = task.size;
         std::vector<N> result;
         result.resize(size);
 
@@ -53,12 +53,4 @@ public:
 };
 
 template<typename T, typename N>
-static AdamsBashforth<T, N> GLOBAL_SOLVER = AdamsBashforth<T, N>();
-
-extern "C" double *solver_eval_next(CauchyTask<double, double> task, double *out_time) {
-    return GLOBAL_SOLVER<double, double>.next_solution(task, *out_time);
-}
-
-extern "C" void solver_prepare(CauchyTask<double, double> task) {
-    GLOBAL_SOLVER<double, double>.prepare_for_task(task);
-}
+std::unique_ptr<Solver<T, N>> GLOBAL_SOLVER = std::make_unique<AdamsBashforth<T, N>>();
